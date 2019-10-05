@@ -1,4 +1,89 @@
 # #!/usr/bin/perl
+
+snippet report
+	sub ${1:procedurename} {
+
+	  my $title = '${2:ReportTitle}';
+	  my @searchcols = qw(${3:from_date to_date});
+
+	  my $where = "(1 = 1)";
+	  #$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
+
+	  $totalcols = [qw(${4:col1 col2 col3})];
+
+	  my $query = qq~
+		  SELECT
+			 ${5:chart_id, id, transdate, memo, amount, parts_id}
+		  FROM ${6:tablename}
+		  WHERE $where
+		  UNION
+		  SELECT
+			 null, null, null, null, null, null
+		  ORDER BY 2
+		  LIMIT 10
+	  ~;
+	  $table = $form->{dbs}->query($query, @bind)->xto();
+	  #$table->drop_cols([qw(memo)]);
+
+	  $table->modify(table => {cellpadding => "3", cellspacing => "2"});
+	  $table->modify(tr => {class => ['listrow0', 'listrow1']});
+	  $table->modify(th => {class => 'listheading'}, 'head');
+	  $table->modify(th => {class => 'listtotal'},   'foot');
+	  $table->modify(th => {class => 'listsubtotal'});
+	  $table->modify(th => {align => 'center'},      'head');
+	  $table->modify(th => {align => 'right'},       'foot');
+	  $table->modify(th => {align => 'right'});
+
+	  $table->modify(td => {align => 'right'}, $totalcols);
+	  $table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
+	  $table->set_group('chart_id', 1);
+	  $table->calc_subtotals($totalcols);
+	  $table->calc_totals($totalcols);
+
+	  my $callback = $form->escape($form->{callback});
+	  my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
+
+	  $table->map_cell(
+		sub {
+		  my $datum = shift;
+		  my $row   = $table->get_current_row();
+		  my $col   = $table->get_current_col();
+		  return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
+		},
+		'id'
+	  );
+
+	  $table->map_head(sub {
+		  my $datum = shift;
+		  $datum =~ tr/_/ /;
+		  return qq|<a class="listheading">| . uc $datum . qq|</a>|;
+		}
+	  );
+
+	  $form->header;
+	  print qq|
+	<body>
+	<h1>$title</h1>
+	<hr/>
+	|;
+
+	  for (@searchcols){
+		  my $label = $_; $label =~ tr/_/ /; $label = uc $label;
+		  print qq|<b>$label</b>: $form->{$_}<br/>\n|;
+	  };
+
+	  print $table->output;
+
+	q|
+	[Custom Reports--$2]
+	module=xto.pl
+	action=continue
+	nextsub=$1
+	|
+	${0}
+	}
+
+
 snippet #!
 	#!/usr/bin/env perl
 
