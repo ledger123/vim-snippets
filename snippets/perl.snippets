@@ -1,78 +1,176 @@
 # #!/usr/bin/perl
+snippet	formlookup
+	my @src = $form->{dbs}->query(qq|SELECT DISTINCT cval FROM lookup WHERE cname='src' ORDER BY 1|)->arrays;
+snippet formtrtype
+	my @trtype     = $form->{dbs}->query(qq~SELECT id, trtype FROM trtype ORDER BY 2~)->arrays;
+snippet formdepartment
+	my @department = $form->{dbs}->query(qq|SELECT id, description FROM department ORDER BY 2|)->hashes;
+snippet formchart
+	my @chart = $form->{dbs}->query(qq~SELECT id, accno || '-' || description FROM chart WHERE link LIKE '%_tax%' ORDER BY 2~)->hashes;
+snippet formgroup
+	my @partsgroup = $form->{dbs}->query(qq|SELECT id, partsgroup FROM partsgroup ORDER BY 2|)->arrays;
+snippet formvendor
+	my @vendor_id = $form->{dbs}->query(qq|
+		SELECT id, name
+		FROM vendor
+		WHERE id IN (SELECT DISTINCT vendor_id FROM ap WHERE amount > 0 AND amount <> paid)
+		ORDER BY 2
+	|)->arrays;
+snippet formcustomer
+	my @customer_id   = $form->{dbs}->query(qq~
+	SELECT c.id, c.name
+	FROM customer c
+	WHERE c.id IN
+	(SELECT ar.customer_id
+		FROM ar
+		JOIN acc_trans ac ON (ac.trans_id = ar.id)
+		JOIN chart c ON (c.id = ac.chart_id)
+		GROUP BY ar.customer_id
+		HAVING SUM(ac.amount) <> 0)
+		AND c.id IN (SELECT btc_id FROM res)
+	ORDER BY c.name
+	~)->arrays;
+snippet formres_id
+	my @res_id = $form->{dbs}->query(qq~
+		SELECT res.id, room.room || '-' || c.name || ' - Rate:' || res.rate description
+		FROM res
+		JOIN room ON res.room_id = room.id
+		JOIN customer c ON (c.id = res.customer_id)
+		WHERE resstatus = 'checkin'
+		ORDER BY 2
+    ~)->arrays;
+snippet formsave
+	sub save {
 
+	}
+snippet formload
+	sub edit {
+
+	}
+snippet dbs
+	use DBIx::Simple;
+
+snippet dbslist
+	my (${1}:$var1, ${2:$var2} ) = $form->{dbs}->query("SELECT $1, $2 FROM ${3:tablename} WHERE id = ?", $form->{id})->list;
+snippet form
+	sub form {
+		my @form1flds = qw(room description roomtype_id status floor location active notes);
+
+		my $form1 = CGI::FormBuilder->new(
+			method   => 'post',
+			table    => 1,
+			fields   => \@form1flds,
+			required => [qw(room status roomtype_id)],
+			options  => {status => $statuses, roomtype_id => \@roomtypes,},
+			messages => {form_required_text => '',},
+			labels   => {
+							id => $locale->text('ID'),
+						},
+			selectnum => 2,
+			submit    => ["Update", "Save", "Save_as_new", "Delete"],
+			params    => $form,
+			fieldattr  => {class => "form-control form-control-sm"},
+			stylesheet => 1,
+			template   => {type => 'TT2', template => 'trtypes.form.tmpl', variable => 'form1',},
+			keepextras => [qw(id title action path login callback)],
+		);
+		$form1->field(name => 'active',    options => '1', value => '1');
+		$form1->field(name => 'description', type => 'textarea');
+		$form1->field(name => 'notes',       type => 'textarea');
+
+		if (!$form->{admin}) {
+			$form1->field(name => 'fieldname', type => 'static');
+		}
+		$form->header;
+		print $form1->render;
+	}
+	sub save {
+		my $data      = {};
+		my @form1flds = qw(id trtype formname);
+		for (@form1flds) { $data->{$_} = $form->{$_} }
+			if ($data->{id}) {
+			$form->{dbs}->update('trtype', $data, {id => $data->{id}}) or $form->error($form->{dbs}->error);
+		}
+		else {
+			delete $data->{id};
+			$form->{dbs}->insert('trtype', $data) or $form->error($form->{dbs}->error);
+		}
+		$form->{dbs}->commit;
+		$form->redirect($locale->text('Saved!'));
+	}
 snippet report
 	sub ${1:procedurename} {
 
-	  my $title = '${2:ReportTitle}';
-	  my @searchcols = qw(${3:from_date to_date});
+	my $title = '${2:ReportTitle}';
+	my @searchcols = qw(${3:from_date to_date});
 
-	  my $where = "(1 = 1)";
-	  #$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
+	my $where = "(1 = 1)";
+	#$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
 
-	  $totalcols = [qw(${4:col1 col2 col3})];
+	$totalcols = [qw(${4:col1 col2 col3})];
 
-	  my $query = qq~
-		  SELECT
-			 ${5:chart_id, id, transdate, memo, amount, parts_id}
-		  FROM ${6:tablename}
-		  WHERE $where
-		  UNION
-		  SELECT
-			 null, null, null, null, null, null
-		  ORDER BY 2
-		  LIMIT 10
-	  ~;
-	  $table = $form->{dbs}->query($query, @bind)->xto();
-	  #$table->drop_cols([qw(memo)]);
+	my $query = qq~
+	SELECT
+	${5:chart_id, id, transdate, memo, amount, parts_id}
+	FROM ${6:tablename}
+	WHERE $where
+	UNION
+	SELECT
+	null, null, null, null, null, null
+	ORDER BY 2
+	LIMIT 10
+	~;
+	$table = $form->{dbs}->query($query, @bind)->xto();
+	#$table->drop_cols([qw(memo)]);
 
-	  $table->modify(table => {cellpadding => "3", cellspacing => "2"});
-	  $table->modify(tr => {class => ['listrow0', 'listrow1']});
-	  $table->modify(th => {class => 'listheading'}, 'head');
-	  $table->modify(th => {class => 'listtotal'},   'foot');
-	  $table->modify(th => {class => 'listsubtotal'});
-	  $table->modify(th => {align => 'center'},      'head');
-	  $table->modify(th => {align => 'right'},       'foot');
-	  $table->modify(th => {align => 'right'});
+	$table->modify(table => {cellpadding => "3", cellspacing => "2"});
+	$table->modify(tr => {class => ['listrow0', 'listrow1']});
+	$table->modify(th => {class => 'listheading'}, 'head');
+	$table->modify(th => {class => 'listtotal'},   'foot');
+	$table->modify(th => {class => 'listsubtotal'});
+	$table->modify(th => {align => 'center'},      'head');
+	$table->modify(th => {align => 'right'},       'foot');
+	$table->modify(th => {align => 'right'});
 
-	  $table->modify(td => {align => 'right'}, $totalcols);
-	  $table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
-	  $table->set_group('chart_id', 1);
-	  $table->calc_subtotals($totalcols);
-	  $table->calc_totals($totalcols);
+	$table->modify(td => {align => 'right'}, $totalcols);
+	$table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
+	$table->set_group('chart_id', 1);
+	$table->calc_subtotals($totalcols);
+	$table->calc_totals($totalcols);
 
-	  my $callback = $form->escape($form->{callback});
-	  my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
+	my $callback = $form->escape($form->{callback});
+	my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
 
-	  $table->map_cell(
-		sub {
-		  my $datum = shift;
-		  my $row   = $table->get_current_row();
-		  my $col   = $table->get_current_col();
-		  return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
-		},
-		'id'
-	  );
+	$table->map_cell(
+	sub {
+	my $datum = shift;
+	my $row   = $table->get_current_row();
+	my $col   = $table->get_current_col();
+	return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
+	},
+	'id'
+	);
 
-	  $table->map_head(sub {
-		  my $datum = shift;
-		  $datum =~ tr/_/ /;
-		  return qq|<a class="listheading">| . uc $datum . qq|</a>|;
-		}
-	  );
+	$table->map_head(sub {
+	my $datum = shift;
+	$datum =~ tr/_/ /;
+	return qq|<a class="listheading">| . uc $datum . qq|</a>|;
+	}
+	);
 
-	  $form->header;
-	  print qq|
+	$form->header;
+	print qq|
 	<body>
 	<h1>$title</h1>
 	<hr/>
 	|;
 
-	  for (@searchcols){
-		  my $label = $_; $label =~ tr/_/ /; $label = uc $label;
-		  print qq|<b>$label</b>: $form->{$_}<br/>\n|;
-	  };
+	for (@searchcols){
+	my $label = $_; $label =~ tr/_/ /; $label = uc $label;
+	print qq|<b>$label</b>: $form->{$_}<br/>\n|;
+	};
 
-	  print $table->output;
+	print $table->output;
 
 	q|
 	[Custom Reports--$2]
@@ -82,7 +180,79 @@ snippet report
 	|
 	${0}
 	}
+snippet q
+	my $query = qq|
+		SELECT ${1:id}
+		FROM ${2:tablename}
+		WHERE ${3:1 = 1}
+		ORDER BY 1
+	|;
+	my @rows = $form->{dbs}->query($query)->hashes;
+	for (@rows){
+		print qq|<td>|;
+		print $_->{id};
+		print qq|</td>|;
+	}
+snippet f
+	$form->format_amount(\%myconfig, ${1:$amount}, 2)
+snippet p
+	print "${1:text}";
+snippet pq
+	print qq|
+	${0}
+	|;
+snippet	table
+	<table>
+		${0}
+	</table>
+snippet tr
+	<tr class="${1:listrow0}">
+		${0}
+	</tr>
+snippet td
+	<td valign="top">${0}</td>
+snippet dumper
+	use Data::Dumper; $form->info('<pre>'); print Dumper(${1:$varname}); # $form->error;
+snippet debug
+	$form->info('<pre>'); $form->debug; # $form->error;
+snippet error
+	$form->error("${0:$variable}");
+snippet blank
+	$form->isblank($form->isblank("${1:var}", "${2:varname} cannot be blank ..."));
+snippet locale
+	$locale->text("${0:text here}")
+snippet log
+	my $ip = $ENV{REMOTE_ADDR};
+	$form->{dbs}->query(qq|
+		INSERT INTO audittrail (trans_id, formname, tablename, action, login, notes, ip)
+		VALUES (?,?,?,?,?,?,?)|,
+			$form->{${1:trans_id}}, '${2:formname}', '${3:tablename}', '${4:action}', $form->{login2}, '${5:notes}', $ip
+		);
+	$form->{dbs}->commit;
+snippet showlog
+	my $audit = $form->{dbs}->query(qq|
+		SELECT e.name, a.login, a.action, a.notes, TO_CHAR(a.transdate, 'DD/MM/YY HH24:MI') transdate, ip
+		FROM audittrail a
+		LEFT JOIN employee e ON (e.id = a.employee_id)
+		WHERE trans_id = ?
+		AND formname = '${1:formname}'
+		AND action = '${2:action}'
 
+		UNION
+
+		SELECT null, null, null, null, null, null
+
+		ORDER BY 5 DESC
+
+		LIMIT 20|, $form->{id}
+	)->xto(
+		tr => {class => ['listrow0', 'listrow1']}, th => {class => ['listheading']},
+	);
+	print qq|<h3>Audit log ...</h3>|;
+	print $audit->output;
+snippet #
+
+	# `system("date +%F")`# armaghan ${1:comment here}
 
 snippet #!
 	#!/usr/bin/env perl
