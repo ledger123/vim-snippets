@@ -16,6 +16,7 @@ snippet formvendor
 		WHERE id IN (SELECT DISTINCT vendor_id FROM ap WHERE amount > 0 AND amount <> paid)
 		ORDER BY 2
 	|)->arrays;
+
 snippet formcustomer
 	my @customer_id   = $form->{dbs}->query(qq~
 	SELECT c.id, c.name
@@ -30,6 +31,7 @@ snippet formcustomer
 		AND c.id IN (SELECT btc_id FROM res)
 	ORDER BY c.name
 	~)->arrays;
+
 snippet formres_id
 	my @res_id = $form->{dbs}->query(qq~
 		SELECT res.id, room.room || '-' || c.name || ' - Rate:' || res.rate description
@@ -38,20 +40,23 @@ snippet formres_id
 		JOIN customer c ON (c.id = res.customer_id)
 		WHERE resstatus = 'checkin'
 		ORDER BY 2
-    ~)->arrays;
+	~)->arrays;
 snippet formsave
 	sub save {
 
 	}
+
 snippet formload
 	sub edit {
 
 	}
+
 snippet dbs
 	use DBIx::Simple;
 
 snippet dbslist
 	my (${1}:$var1, ${2:$var2} ) = $form->{dbs}->query("SELECT $1, $2 FROM ${3:tablename} WHERE id = ?", $form->{id})->list;
+
 snippet form
 	sub form {
 		my @form1flds = qw(room description roomtype_id status floor location active notes);
@@ -101,76 +106,76 @@ snippet form
 snippet report
 	sub ${1:procedurename} {
 
-	my $title = '${2:ReportTitle}';
-	my @searchcols = qw(${3:from_date to_date});
+		my $title = '${2:ReportTitle}';
+		my @searchcols = qw(${3:from_date to_date});
 
-	my $where = "(1 = 1)";
-	#$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
+		my $where = "(1 = 1)";
+		#$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
 
-	$totalcols = [qw(${4:col1 col2 col3})];
+		$totalcols = [qw(${4:col1 col2 col3})];
 
-	my $query = qq~
-	SELECT
-	${5:chart_id, id, transdate, memo, amount, parts_id}
-	FROM ${6:tablename}
-	WHERE $where
-	UNION
-	SELECT
-	null, null, null, null, null, null
-	ORDER BY 2
-	LIMIT 10
-	~;
-	$table = $form->{dbs}->query($query, @bind)->xto();
-	#$table->drop_cols([qw(memo)]);
+		my $query = qq~
+		SELECT
+			${5:chart_id, id, transdate, memo, amount, parts_id}
+		FROM ${6:tablename}
+		WHERE $where
+		UNION
+		SELECT
+			null, null, null, null, null, null
+		ORDER BY 2
+		LIMIT 10
+		~;
+		$table = $form->{dbs}->query($query, @bind)->xto();
+		#$table->drop_cols([qw(memo)]);
 
-	$table->modify(table => {cellpadding => "3", cellspacing => "2"});
-	$table->modify(tr => {class => ['listrow0', 'listrow1']});
-	$table->modify(th => {class => 'listheading'}, 'head');
-	$table->modify(th => {class => 'listtotal'},   'foot');
-	$table->modify(th => {class => 'listsubtotal'});
-	$table->modify(th => {align => 'center'},      'head');
-	$table->modify(th => {align => 'right'},       'foot');
-	$table->modify(th => {align => 'right'});
+		$table->modify(table => {cellpadding => "3", cellspacing => "2"});
+		$table->modify(tr => {class => ['listrow0', 'listrow1']});
+		$table->modify(th => {class => 'listheading'}, 'head');
+		$table->modify(th => {class => 'listtotal'},   'foot');
+		$table->modify(th => {class => 'listsubtotal'});
+		$table->modify(th => {align => 'center'},      'head');
+		$table->modify(th => {align => 'right'},       'foot');
+		$table->modify(th => {align => 'right'});
 
-	$table->modify(td => {align => 'right'}, $totalcols);
-	$table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
-	$table->set_group('chart_id', 1);
-	$table->calc_subtotals($totalcols);
-	$table->calc_totals($totalcols);
+		$table->modify(td => {align => 'right'}, $totalcols);
+		$table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
+		$table->set_group('chart_id', 1);
+		$table->calc_subtotals($totalcols);
+		$table->calc_totals($totalcols);
 
-	my $callback = $form->escape($form->{callback});
-	my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
+		my $callback = $form->escape($form->{callback});
+		my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
 
-	$table->map_cell(
-	sub {
-	my $datum = shift;
-	my $row   = $table->get_current_row();
-	my $col   = $table->get_current_col();
-	return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
-	},
-	'id'
-	);
+		$table->map_cell(
+			sub {
+				my $datum = shift;
+				my $row   = $table->get_current_row();
+				my $col   = $table->get_current_col();
+				return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
+			},
+			'id'
+		);
 
-	$table->map_head(sub {
-	my $datum = shift;
-	$datum =~ tr/_/ /;
-	return qq|<a class="listheading">| . uc $datum . qq|</a>|;
-	}
-	);
+		$table->map_head(sub {
+			my $datum = shift;
+			$datum =~ tr/_/ /;
+			return qq|<a class="listheading">| . uc $datum . qq|</a>|;
+			}
+		);
 
-	$form->header;
-	print qq|
-	<body>
-	<h1>$title</h1>
-	<hr/>
-	|;
+		$form->header;
+		print qq|
+			<body>
+			<h1>$title</h1>
+			<hr/>
+		|;
 
-	for (@searchcols){
-	my $label = $_; $label =~ tr/_/ /; $label = uc $label;
-	print qq|<b>$label</b>: $form->{$_}<br/>\n|;
-	};
+		for (@searchcols){
+			my $label = $_; $label =~ tr/_/ /; $label = uc $label;
+			print qq|<b>$label</b>: $form->{$_}<br/>\n|;
+		};
 
-	print $table->output;
+		print $table->output;
 
 	q|
 	[Custom Reports--$2]
