@@ -1,14 +1,25 @@
 # #!/usr/bin/perl
 snippet	formlookup
-	my @src = $form->{dbs}->query(qq|SELECT DISTINCT cval FROM lookup WHERE cname='src' ORDER BY 1|)->arrays;
+	my @${1:cname} = $form->{dbs}->query(qq|SELECT DISTINCT cval FROM lookup WHERE cname='$1' ORDER BY 1|)->arrays;
+	${0}
 snippet formtrtype
 	my @trtype     = $form->{dbs}->query(qq~SELECT id, trtype FROM trtype ORDER BY 2~)->arrays;
+	${0}
 snippet formdepartment
 	my @department = $form->{dbs}->query(qq|SELECT id, description FROM department ORDER BY 2|)->hashes;
 snippet formchart
-	my @chart = $form->{dbs}->query(qq~SELECT id, accno || '-' || description FROM chart WHERE link LIKE '%_tax%' ORDER BY 2~)->hashes;
+	my @chart = $form->{dbs}->query(qq~
+		SELECT id, accno || '-' || description
+		FROM chart
+		WHERE link LIKE '%_tax%'
+		ORDER BY 2~
+	)->hashes;
 snippet formgroup
-	my @partsgroup = $form->{dbs}->query(qq|SELECT id, partsgroup FROM partsgroup ORDER BY 2|)->arrays;
+	my @partsgroup = $form->{dbs}->query(qq|
+		SELECT id, partsgroup
+		FROM partsgroup
+		ORDER BY 2|
+	)->arrays;
 snippet formvendor
 	my @vendor_id = $form->{dbs}->query(qq|
 		SELECT id, name
@@ -19,17 +30,17 @@ snippet formvendor
 
 snippet formcustomer
 	my @customer_id   = $form->{dbs}->query(qq~
-	SELECT c.id, c.name
-	FROM customer c
-	WHERE c.id IN
-	(SELECT ar.customer_id
-		FROM ar
-		JOIN acc_trans ac ON (ac.trans_id = ar.id)
-		JOIN chart c ON (c.id = ac.chart_id)
-		GROUP BY ar.customer_id
-		HAVING SUM(ac.amount) <> 0)
-		AND c.id IN (SELECT btc_id FROM res)
-	ORDER BY c.name
+		SELECT c.id, c.name
+		FROM customer c
+		WHERE c.id IN
+		(SELECT ar.customer_id
+			FROM ar
+			JOIN acc_trans ac ON (ac.trans_id = ar.id)
+			JOIN chart c ON (c.id = ac.chart_id)
+			GROUP BY ar.customer_id
+			HAVING SUM(ac.amount) <> 0)
+			AND c.id IN (SELECT btc_id FROM res)
+		ORDER BY c.name
 	~)->arrays;
 
 snippet formres_id
@@ -41,32 +52,31 @@ snippet formres_id
 		WHERE resstatus = 'checkin'
 		ORDER BY 2
 	~)->arrays;
-snippet formsave
-	sub save {
 
-	}
-
-snippet formload
-	sub edit {
-
-	}
 
 snippet dbs
 	use DBIx::Simple;
 
 snippet dbslist
-	my (${1}:$var1, ${2:$var2} ) = $form->{dbs}->query("SELECT $1, $2 FROM ${3:tablename} WHERE id = ?", $form->{id})->list;
+	my (${1}:$var1, ${2:$var2} ) = $form->{dbs}->query(qq~
+		SELECT $1, $2
+		FROM ${3:tablename}
+		WHERE id = ?
+		~, $form->{id}
+	)->list;
 
 snippet form
 	sub form {
-		my @form1flds = qw(room description roomtype_id status floor location active notes);
+		my @form1flds = qw(id ${1:name descripiton});
 
 		my $form1 = CGI::FormBuilder->new(
 			method   => 'post',
 			table    => 1,
 			fields   => \@form1flds,
-			required => [qw(room status roomtype_id)],
-			options  => {status => $statuses, roomtype_id => \@roomtypes,},
+			required => [qw($1)],
+			options  => {
+				lookup => \@lookup,
+			},
 			messages => {form_required_text => '',},
 			labels   => {
 							id => $locale->text('ID'),
@@ -79,30 +89,53 @@ snippet form
 			template   => {type => 'TT2', template => 'trtypes.form.tmpl', variable => 'form1',},
 			keepextras => [qw(id title action path login callback)],
 		);
-		$form1->field(name => 'active',    options => '1', value => '1');
-		$form1->field(name => 'description', type => 'textarea');
-		$form1->field(name => 'notes',       type => 'textarea');
+		#$form1->field(name => 'active',    options => '1', value => '1');
+		#$form1->field(name => 'description', type => 'textarea');
 
-		if (!$form->{admin}) {
-			$form1->field(name => 'fieldname', type => 'static');
+		if ($form->{admin}) {
+			#$form1->field(name => 'fieldname', type => 'static');
 		}
 		$form->header;
 		print $form1->render;
 	}
+
+	sub update {
+		&form;
+	}
+
+	sub save_as_new {
+		delete $form->{id};
+		&save;
+	}
+
 	sub save {
 		my $data      = {};
-		my @form1flds = qw(id trtype formname);
+		my @form1flds = qw($1);
 		for (@form1flds) { $data->{$_} = $form->{$_} }
 			if ($data->{id}) {
-			$form->{dbs}->update('trtype', $data, {id => $data->{id}}) or $form->error($form->{dbs}->error);
+			$form->{dbs}->update('${2:tname}', $data, {id => $data->{id}}) or $form->error($form->{dbs}->error);
 		}
 		else {
 			delete $data->{id};
-			$form->{dbs}->insert('trtype', $data) or $form->error($form->{dbs}->error);
+			$form->{dbs}->insert('$2', $data) or $form->error($form->{dbs}->error);
 		}
 		$form->{dbs}->commit;
-		$form->redirect($locale->text('Saved!'));
 	}
+
+	sub edit {
+		$row = $form->{dbs}->query(qq~
+			SELECT *
+			FROM $2
+			WHERE id = ?~, $form->{id}
+		)->hash;
+		for (keys %$row) { $form->{$_} = $row->{$_} }
+	}
+
+	sub delete {
+		$form->{dbs}->query(qq|DELETE FROM $2 WHERE id = ?|, $form->{id});
+		$form->{dbs}->commit;
+	}
+
 snippet report
 	sub ${1:procedurename} {
 
@@ -185,6 +218,7 @@ snippet report
 	|
 	${0}
 	}
+
 snippet q
 	my $query = qq|
 		SELECT ${1:id}
@@ -198,6 +232,7 @@ snippet q
 		print $_->{id};
 		print qq|</td>|;
 	}
+
 snippet f
 	$form->format_amount(\%myconfig, ${1:$amount}, 2)
 snippet p
@@ -211,7 +246,7 @@ snippet	table
 		${0}
 	</table>
 snippet tr
-	<tr class="${1:listrow0}">
+	<tr class="${1:listrow0"}">
 		${0}
 	</tr>
 snippet td
@@ -226,7 +261,7 @@ snippet blank
 	$form->isblank($form->isblank("${1:var}", "${2:varname} cannot be blank ..."));
 snippet locale
 	$locale->text("${0:text here}")
-snippet log
+snippet addlog
 	my $ip = $ENV{REMOTE_ADDR};
 	$form->{dbs}->query(qq|
 		INSERT INTO audittrail (trans_id, formname, tablename, action, login, notes, ip)
