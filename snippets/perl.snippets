@@ -53,7 +53,6 @@ snippet formres_id
 		ORDER BY 2
 	~)->arrays;
 
-
 snippet dbs
 	use DBIx::Simple;
 	$form->{dbh} = $form->dbconnect(\%myconfig);
@@ -66,6 +65,31 @@ snippet dbslist
 		WHERE id = ?
 		~, $form->{id}
 	)->list;
+
+snippet dbsrow
+	my $row = $form->{dbs}->query('
+		SELECT *
+		FROM ${1:tablename}
+		WHERE id = ?',
+		$form->{id}
+	)->hash or $form->error($form->{dbs}->error);
+	for (keys %$row) { $form->{$_} = $row->{$_} }
+	${0}
+
+snippet dbsrows
+	my @rows = $form->{dbs}->query('
+		SELECT *
+		FROM ${1:tablename}
+		WHERE trans_id = ?',
+		$form->{id}
+	)->hashes or $form->error($form->{dbs}->error);
+	my $i = 1;
+	for my $row (@rows){
+	  for (keys %$row) { $form->{"${_}_$i" = $row->{$_} }
+	  $i++;
+	}
+	$form->{rowcount} = $i;
+	${0}
 
 snippet form
 	sub form {
