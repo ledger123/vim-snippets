@@ -245,10 +245,19 @@ snippet f
 	$form->format_amount(\%myconfig, ${1:$amount}, 2)
 snippet p
 	print "${1:text}";
+snippet i
+	$form->info("${1:text}\n");
+snippet e
+	$form->error("${1:text}\n");
 snippet pq
 	print qq|
 	${0}
 	|;
+snippet dbname
+	if ($myconfig{dbname} =~ /(${1:munshi10})/){
+		$form->error("dbname");
+	}
+
 snippet	table
 	<table>
 		${0}
@@ -416,7 +425,12 @@ snippet for
 	foreach my $${1:x} (@${2:array}) {
 		${0}
 	}
-# Foreach Loop One-line
+snippet for2
+	for $i (1 .. $form->{rowcount}) {
+		$id = $form->{"id_$i"};
+	}
+snippet	lv
+	my $${1:var} = $form->{"$1_$i"};
 snippet fore
 	${1:expression} foreach @${2:array};
 # Package
