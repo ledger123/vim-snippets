@@ -291,6 +291,10 @@ snippet dbname
 	if ($myconfig{dbname} =~ /(${1:munshi10})/){
 		$form->error("dbname");
 	}
+snippet admin
+	if ($form->{admin}){
+		$form->error("I am here ...");
+	}
 
 snippet	table
 	<table>
