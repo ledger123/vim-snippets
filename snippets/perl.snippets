@@ -53,6 +53,12 @@ snippet formres_id
 		ORDER BY 2
 	~)->arrays;
 
+snippet	setd
+	$form->setd('${1:var}');
+
+snippet getd
+	$form->{${1:var}} = $form->getd('$1');
+
 snippet dbs
 	use DBIx::Simple;
 	$form->{dbh} = $form->dbconnect(\%myconfig);
@@ -267,6 +273,10 @@ snippet q
 
 snippet f
 	$form->format_amount(\%myconfig, ${1:$amount}, 2)
+snippet fv
+	$form->{"${1:var}"} = $$1;
+snippet fv2
+	$${1:var} = $form->{"$1"};
 snippet p
 	print "${1:text}";
 snippet i
