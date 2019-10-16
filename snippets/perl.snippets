@@ -85,6 +85,12 @@ snippet dbsrows
 	$form->{rowcount} = $i;
 	${0}
 
+snippet formfield
+	$form1->field(name => '${1:fieldname}', class => '${2:date}', size => '${3:10}', type => '${4:text}', value => '${5:default}');
+snippet formoption
+	${1:optionname} => \@$1,
+snippet formlabel
+	${1:labelcol} => $locale->text('${2:Lable}'),
 snippet form
 	sub form {
 		my @form1flds = qw(id ${1:name descripiton});
@@ -166,15 +172,41 @@ snippet report
 		my $title = '${2:ReportTitle}';
 		my @searchcols = qw(${3:from_date to_date});
 
+		$form->{nextsub} = 'report1';
+		my $template = &report1_template;
+
+		my $form1 = CGI::FormBuilder->new(
+			method   => 'post',
+			table    => 1,
+			title    => $title,
+			fields   => \@searchcols,
+			messages => {form_required_text => '',},
+			labels   => {
+
+			},
+			submit   => [qw(Continue)],
+			options    => {
+
+			},
+			params     => $form,
+			stylesheet => 1,
+			template   => {type => 'TT2', template => \\$template, variable => 'form1',},
+			keepextras => [qw(nextsub action path login)],
+		);
+		$form->header;
+		print $form1->render;
+
 		my $where = "(1 = 1)";
 		#$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
 
 		$totalcols = [qw(${4:col1 col2 col3})];
 
+		$groupcol = '${5:groupcol}';
+
 		my $query = qq~
 		SELECT
-			${5:chart_id, id, transdate, memo, amount, parts_id}
-		FROM ${6:tablename}
+			${6:chart_id, id, transdate, memo, amount, parts_id}
+		FROM ${7:tablename}
 		WHERE $where
 		UNION
 		SELECT
@@ -196,9 +228,9 @@ snippet report
 
 		$table->modify(td => {align => 'right'}, $totalcols);
 		$table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
-		$table->set_group('chart_id', 1);
-		$table->calc_subtotals($totalcols);
-		$table->calc_totals($totalcols);
+		#$table->set_group($groupcol, 1);
+		#$table->calc_subtotals($totalcols);
+		#$table->calc_totals($totalcols);
 
 		my $callback = $form->escape($form->{callback});
 		my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
@@ -241,6 +273,54 @@ snippet report
 	nextsub=$1
 	|
 	${0}
+	}
+
+	sub $1_template {
+		return q|
+	[% form1.jshead %]
+	<body onLoad="document.forms[0].reference.focus()" />
+
+	<table width=100%>
+	<tr>
+		<th class=listtop>[% form1.title %]</th>
+	</tr>
+	<tr height="5"></tr>
+	<tr>
+		<td align="top">
+		[% form1.start %]
+			<table>
+				<tr valign="top">
+					<td><table>
+						[% i = 1 %]
+						[% FOREACH field = form1.fields %]
+							<tr valign="top">
+								<th align="right">[% field.required ? "$field.label *" : field.label %]</th>
+								<td>
+								[% IF field.invalid %]
+								Missing or invalid entry, please try again.<br/>
+								[% END %]
+								[% field.field %]
+								</td>
+							</tr>
+						[% IF i == 3 OR i == 6 OR i == 9 %]
+						</table></td><td><table>
+						[% END %]
+						[% i = i + 1 %]
+						[% END %]
+					</td></table>
+				</tr>
+			</table>
+		</td>
+	</tr>
+	</table>
+
+	<hr size=3 noshade />
+
+	[% form1.submit %] [% form1.reset %]
+	[% form1.end %]
+	<br/><br/>
+	|;
+
 	}
 
 snippet q
