@@ -172,85 +172,34 @@ snippet report
 		my $title = '${2:ReportTitle}';
 		my @searchcols = qw(${3:from_date to_date});
 
-		$form->{nextsub} = 'report1';
-		my $template = &report1_template;
-
-		my $form1 = CGI::FormBuilder->new(
-			method   => 'post',
-			table    => 1,
-			title    => $title,
-			fields   => \@searchcols,
-			messages => {form_required_text => '',},
-			labels   => {
-
-			},
-			submit   => [qw(Continue)],
-			options    => {
-
-			},
-			params     => $form,
-			stylesheet => 1,
-			template   => {type => 'TT2', template => \\$template, variable => 'form1',},
-			keepextras => [qw(nextsub action path login)],
-		);
+		my $form1 = &$1_form($title, \\@searchcols);
 		$form->header;
 		print $form1->render;
 
-		my $where = "(1 = 1)";
-		#$where .= qq|AND parts_id IS NOT NULL AND parts_id <> 0|;
+		my $totalcols = [qw(${4:col1 col2 col3})];
 
-		$totalcols = [qw(${4:col1 col2 col3})];
+		my $groupcol = '${5:groupcol}';
 
-		$groupcol = '${5:groupcol}';
+		my $sql = SQL::Abstract->new;
+		my %where;
+		for (@searchcols){
+			$where{$_} = $form->{$_} if $form->{$_} and $_ !~ /(from_date|to_date)/;
+		}
+		my ($where, @bind) = $sql->where(\%where);
 
 		my $query = qq~
-		SELECT
-			${6:chart_id, id, transdate, memo, amount, parts_id}
-		FROM ${7:tablename}
-		WHERE $where
-		UNION
-		SELECT
-			null, null, null, null, null, null
-		ORDER BY 2
-		LIMIT 10
+			SELECT
+				${6:chart_id, id, transdate, memo, amount, parts_id}
+			FROM ${7:tablename}
+			$where
+			UNION
+			SELECT
+				null, null, null, null, null, null
+			ORDER BY 2
+			LIMIT 100
 		~;
-		$table = $form->{dbs}->query($query, @bind)->xto();
-		#$table->drop_cols([qw(memo)]);
 
-		$table->modify(table => {cellpadding => "3", cellspacing => "2"});
-		$table->modify(tr => {class => ['listrow0', 'listrow1']});
-		$table->modify(th => {class => 'listheading'}, 'head');
-		$table->modify(th => {class => 'listtotal'},   'foot');
-		$table->modify(th => {class => 'listsubtotal'});
-		$table->modify(th => {align => 'center'},      'head');
-		$table->modify(th => {align => 'right'},       'foot');
-		$table->modify(th => {align => 'right'});
-
-		$table->modify(td => {align => 'right'}, $totalcols);
-		$table->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
-		#$table->set_group($groupcol, 1);
-		#$table->calc_subtotals($totalcols);
-		#$table->calc_totals($totalcols);
-
-		my $callback = $form->escape($form->{callback});
-		my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
-
-		$table->map_cell(
-			sub {
-				my $datum = shift;
-				my $row   = $table->get_current_row();
-				my $col   = $table->get_current_col();
-				return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
-			},
-			'id'
-		);
-
-		$table->map_head(sub {
-			my $datum = shift;
-			$datum =~ tr/_/ /;
-			return qq|<a class="listheading">| . uc $datum . qq|</a>|;
-			}
-		);
+		my $table1 = &$1_table($query, \@bind, $totalcols, $groupcol);
 
 		$form->header;
 		print qq|
@@ -264,7 +213,7 @@ snippet report
 			print qq|<b>$label</b>: $form->{$_}<br/>\n|;
 		};
 
-		print $table->output;
+		print $table1->output;
 
 	q|
 	[Custom Reports--$2]
@@ -273,6 +222,76 @@ snippet report
 	nextsub=$1
 	|
 	${0}
+	}
+
+
+	sub $1_form {
+		my ($title, $searchcols) = @_;
+		$form->{nextsub} = '$1';
+		my $template = &$1_template;
+
+		my $form1 = CGI::FormBuilder->new(
+			method   => 'post',
+			table    => 1,
+			title    => $title,
+			fields   => $searchcols,
+			messages => {form_required_text => '',},
+			labels   => {
+
+			},
+			submit   => [qw(Continue)],
+			options    => {
+
+			},
+			params     => $form,
+			stylesheet => 1,
+			template   => {type => 'TT2', template => \\$template, variable => 'form1',},
+			keepextras => [qw(nextsub action path login)],
+		);
+
+		return $form1;
+	}
+
+	sub $1_table {
+		my ($query, $bind, $totalcols, $groupcol) = @_;
+		my $table1 = $form->{dbs}->query($query, @$bind)->xto();
+		#$table1->drop_cols([qw(memo)]);
+
+		$table1->modify(table => {cellpadding => "3", cellspacing => "2"});
+		$table1->modify(tr => {class => ['listrow0', 'listrow1']});
+		$table1->modify(th => {class => 'listheading'}, 'head');
+		$table1->modify(th => {class => 'listtotal'},   'foot');
+		$table1->modify(th => {class => 'listsubtotal'});
+		$table1->modify(th => {align => 'center'},      'head');
+		$table1->modify(th => {align => 'right'},       'foot');
+		$table1->modify(th => {align => 'right'});
+
+		$table1->modify(td => {align => 'right'}, $totalcols);
+		$table1->map_cell(sub { return $form->format_amount(\%myconfig, shift, 2) }, $totalcols);
+		#$table1->set_group($groupcol, 1);
+		#$table1->calc_subtotals($totalcols);
+		#$table1->calc_totals($totalcols);
+
+		my $callback = $form->escape($form->{callback});
+		my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
+
+		$table1->map_cell(
+			sub {
+				my $datum = shift;
+				my $row   = $table1->get_current_row();
+				my $col   = $table1->get_current_col();
+				return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
+			},
+			'id'
+		);
+
+		$table1->map_head(sub {
+			my $datum = shift;
+			$datum =~ tr/_/ /;
+			return qq|<a class="listheading">| . uc $datum . qq|</a>|;
+			}
+		);
+		return $table1;
 	}
 
 	sub $1_template {
