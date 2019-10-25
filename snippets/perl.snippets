@@ -92,14 +92,18 @@ snippet formoption
 snippet formlabel
 	${1:labelcol} => $locale->text('${2:Lable}'),
 snippet form
-	sub form {
-		my @form1flds = qw(id ${1:name descripiton});
+
+	sub form_${1:tablename} {
+		my @form1flds = qw(id ${2:name descripiton});
+
+		$form->{nextsub} = 'continue';
+		$form->{tablename} = '$1';
 
 		my $form1 = CGI::FormBuilder->new(
 			method   => 'post',
 			table    => 1,
 			fields   => \@form1flds,
-			required => [qw($1)],
+			required => [qw($2)],
 			options  => {
 				lookup => \@lookup,
 			},
@@ -113,7 +117,7 @@ snippet form
 			fieldattr  => {class => "form-control form-control-sm"},
 			stylesheet => 1,
 			template   => {type => 'TT2', template => 'trtypes.form.tmpl', variable => 'form1',},
-			keepextras => [qw(id title action path login callback)],
+			keepextras => [qw(id title path tablename login callback)],
 		);
 		#$form1->field(name => 'active',    options => '1', value => '1');
 		#$form1->field(name => 'description', type => 'textarea');
@@ -125,41 +129,51 @@ snippet form
 		print $form1->render;
 	}
 
-	sub update {
-		&form;
+	sub save   { &{"save_$form->{tablename}"} }
+	sub edit   { &{"edit_$form->{tablename}"} }
+	sub delete   { &{"delete_$form->{tablename}"} }
+	sub update   { &{"update_$form->{tablename}"} }
+	sub save_as_new   { &{"save_as_new_$form->{tablename}"} }
+
+	sub update_$1 {
+		&form_$1;
 	}
 
-	sub save_as_new {
+	sub save_as_new_$1 {
 		delete $form->{id};
-		&save;
+		&save_$1;
 	}
 
-	sub save {
+	sub save_$1 {
 		my $data      = {};
-		my @form1flds = qw($1);
+		my @form1flds = qw(id $2);
 		for (@form1flds) { $data->{$_} = $form->{$_} }
 			if ($data->{id}) {
-			$form->{dbs}->update('${2:tname}', $data, {id => $data->{id}}) or $form->error($form->{dbs}->error);
+			$form->{dbs}->update('$1', $data, {id => $data->{id}}) or $form->error($form->{dbs}->error);
 		}
 		else {
 			delete $data->{id};
-			$form->{dbs}->insert('$2', $data) or $form->error($form->{dbs}->error);
+			$form->{dbs}->insert('$1', $data) or $form->error($form->{dbs}->error);
 		}
 		$form->{dbs}->commit;
+		$form->info("Saved ...");
 	}
 
-	sub edit {
+	sub edit_$1 {
+		$form->{tablename} = '$1';
 		$row = $form->{dbs}->query(qq~
 			SELECT *
-			FROM $2
+			FROM $1
 			WHERE id = ?~, $form->{id}
 		)->hash;
 		for (keys %$row) { $form->{$_} = $row->{$_} }
+		&form_$1;
 	}
 
-	sub delete {
-		$form->{dbs}->query(qq|DELETE FROM $2 WHERE id = ?|, $form->{id});
+	sub delete_$1 {
+		$form->{dbs}->query(qq|DELETE FROM $1 WHERE id = ?|, $form->{id});
 		$form->{dbs}->commit;
+		$form->info("Deleted ...");
 	}
 
 snippet defaults
