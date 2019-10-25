@@ -4,9 +4,11 @@ snippet	formlookup
 	${0}
 snippet formtrtype
 	my @trtype     = $form->{dbs}->query(qq~SELECT id, trtype FROM trtype ORDER BY 2~)->arrays;
+	$form1->field(name => 'trtype_id', type => 'select', class => "js-example-basic-single", options => \@trtype);
 	${0}
 snippet formdepartment
 	my @department = $form->{dbs}->query(qq|SELECT id, description FROM department ORDER BY 2|)->hashes;
+	$form1->field(name => 'department_id', type => 'select', class => "js-example-basic-single", options => \@department);
 snippet formchart
 	my @chart = $form->{dbs}->query(qq~
 		SELECT id, accno || '-' || description
@@ -14,20 +16,22 @@ snippet formchart
 		WHERE link LIKE '%_tax%'
 		ORDER BY 2~
 	)->hashes;
+	$form1->field(name => 'chart_id', type => 'select', class => "js-example-basic-single", options => \@chart);
 snippet formgroup
 	my @partsgroup = $form->{dbs}->query(qq|
 		SELECT id, partsgroup
 		FROM partsgroup
 		ORDER BY 2|
 	)->arrays;
+	$form1->field(name => 'partsgroup_id', type => 'select', class => "js-example-basic-single", options => \@partsgroup);
 snippet formvendor
-	my @vendor_id = $form->{dbs}->query(qq|
+	my @vendor = $form->{dbs}->query(qq|
 		SELECT id, name
 		FROM vendor
 		WHERE id IN (SELECT DISTINCT vendor_id FROM ap WHERE amount > 0 AND amount <> paid)
 		ORDER BY 2
 	|)->arrays;
-
+	$form1->field(name => 'vendor_id', type => 'select', class => "js-example-basic-single", options => \@vendor);
 snippet formcustomer
 	my @customer_id   = $form->{dbs}->query(qq~
 		SELECT c.id, c.name
@@ -42,9 +46,10 @@ snippet formcustomer
 			AND c.id IN (SELECT btc_id FROM res)
 		ORDER BY c.name
 	~)->arrays;
+	$form1->field(name => 'vendor_id', type => 'select', class => "js-example-basic-single", options => \@customer);
 
 snippet formres_id
-	my @res_id = $form->{dbs}->query(qq~
+	my @res = $form->{dbs}->query(qq~
 		SELECT res.id, room.room || '-' || c.name || ' - Rate:' || res.rate description
 		FROM res
 		JOIN room ON res.room_id = room.id
@@ -52,6 +57,7 @@ snippet formres_id
 		WHERE resstatus = 'checkin'
 		ORDER BY 2
 	~)->arrays;
+	$form1->field(name => 'res_id', type => 'select', class => "js-example-basic-single", options => \@res);
 
 snippet	setd
 	$form->setd('${1:var}');
@@ -119,6 +125,7 @@ snippet form
 			template   => {type => 'TT2', template => 'trtypes.form.tmpl', variable => 'form1',},
 			keepextras => [qw(id title path tablename login callback)],
 		);
+		$form1->field(name => 'id', type => 'static');
 		#$form1->field(name => 'active',    options => '1', value => '1');
 		#$form1->field(name => 'description', type => 'textarea');
 
@@ -157,7 +164,7 @@ snippet form
 			$form->{dbs}->insert('$1', $data) or $form->error($form->{dbs}->error);
 		}
 		$form->{dbs}->commit;
-		$form->info("Saved ...");
+		$form->redirect("Saved ...");
 	}
 
 	sub add_$1 {
@@ -182,7 +189,7 @@ snippet form
 	sub delete_$1 {
 		$form->{dbs}->query(qq|DELETE FROM $1 WHERE id = ?|, $form->{id});
 		$form->{dbs}->commit;
-		$form->info("Deleted ...");
+		$form->redirect("Deleted ...");
 	}
 
 snippet defaults
@@ -211,7 +218,7 @@ snippet report
 		my ($where, @bind) = $sql->where(\%where);
 
 		my $callback = "$form->{script}?action=$1&path=$form->{path}&login=$form->{login}";
-		for (@searchcols){ $callback .= "$_=$form->{$_}" }
+		for (@searchcols){ $callback .= "&$_=$form->{$_}" }
 		$form->{callback} = $form->escape($callback);
 
 		my $query = qq~
@@ -221,7 +228,7 @@ snippet report
 			$where
 			UNION
 			SELECT
-				null, null, null, null, null, null
+				${8:null, null, null, null, null, null}
 			ORDER BY 2
 			LIMIT 100
 		~;
@@ -299,7 +306,7 @@ snippet report
 		#$table1->calc_subtotals($totalcols);
 		#$table1->calc_totals($totalcols);
 
-		my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
+		my $url = "$form->{script}?action=edit_$7&path=$form->{path}&login=$form->{login}";
 
 		$table1->map_cell(
 			sub {
