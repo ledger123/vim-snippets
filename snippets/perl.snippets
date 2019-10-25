@@ -130,6 +130,7 @@ snippet form
 	}
 
 	sub save   { &{"save_$form->{tablename}"} }
+	sub add   { &{"add_$form->{tablename}"} }
 	sub edit   { &{"edit_$form->{tablename}"} }
 	sub delete   { &{"delete_$form->{tablename}"} }
 	sub update   { &{"update_$form->{tablename}"} }
@@ -157,6 +158,14 @@ snippet form
 		}
 		$form->{dbs}->commit;
 		$form->info("Saved ...");
+	}
+
+	sub add_$1 {
+	  $form->{callback} = "$form->{script}?action=add&login=$form->{login}&path=$form->{path}&tablename=$form->{tablename}" unless $form->{callback};
+	  $form->{title} = $locale->text('Add New $1');
+
+	  # Default values
+	  &form_$1;
 	}
 
 	sub edit_$1 {
@@ -200,6 +209,10 @@ snippet report
 			$where{$_} = $form->{$_} if $form->{$_} and $_ !~ /(from_date|to_date)/;
 		}
 		my ($where, @bind) = $sql->where(\%where);
+
+		my $callback = "$form->{script}?action=$1&path=$form->{path}&login=$form->{login}";
+		for (@searchcols){ $callback .= "$_=$form->{$_}" }
+		$form->{callback} = $form->escape($callback);
 
 		my $query = qq~
 			SELECT
@@ -286,7 +299,6 @@ snippet report
 		#$table1->calc_subtotals($totalcols);
 		#$table1->calc_totals($totalcols);
 
-		my $callback = $form->escape($form->{callback});
 		my $url = "$form->{script}?action=edit&path=$form->{path}&login=$form->{login}";
 
 		$table1->map_cell(
@@ -294,7 +306,7 @@ snippet report
 				my $datum = shift;
 				my $row   = $table1->get_current_row();
 				my $col   = $table1->get_current_col();
-				return qq|<a href="$url&id=$datum&callback=$callback">$datum</a>|;
+				return qq|<a href="$url&id=$datum&callback=$form->{callback}">$datum</a>|;
 			},
 			'id'
 		);
