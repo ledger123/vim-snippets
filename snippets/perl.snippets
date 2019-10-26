@@ -104,6 +104,7 @@ snippet form
 
 		$form->{nextsub} = 'continue';
 		$form->{tablename} = '$1';
+		my $template = &$1_form_template;
 
 		my $form1 = CGI::FormBuilder->new(
 			method   => 'post',
@@ -122,7 +123,7 @@ snippet form
 			params    => $form,
 			fieldattr  => {class => "form-control form-control-sm"},
 			stylesheet => 1,
-			template   => {type => 'TT2', template => 'trtypes.form.tmpl', variable => 'form1',},
+			template   => {type => 'TT2', template => \\$template, variable => 'form1',},
 			keepextras => [qw(id title path tablename login callback)],
 		);
 		$form1->field(name => 'id', type => 'static');
@@ -134,6 +135,49 @@ snippet form
 		}
 		$form->header;
 		print $form1->render;
+	}
+
+	sub $1_form_template {
+		return q|
+	[% form1.jshead %]
+	<body onLoad="document.forms[0].reference.focus()" />
+		<table width=100%>
+			<tr><th class=listtop>[% form1.title %]</th></tr>
+			<tr height="5"></tr>
+			<tr>
+			<td align="top">
+			[% form1.start %]
+			<table>
+			<tr valign="top">
+			<td><table>
+			[% i = 1 %]
+				[% FOREACH field = form1.fields %]
+				<tr valign="top">
+					<th align="right">[% field.required ? "$field.label *" : field.label %]</th>
+					<td>
+						[% IF field.invalid %]
+							Missing or invalid entry, please try again.<br/>
+						[% END %]
+						[% field.field %]
+					</td>
+				</tr>
+				[% IF i == 17 OR i == 34 OR i == 50 %]
+				</table></td><td><table>
+				[% END %]
+				[% i = i + 1 %]
+				[% END %]
+			</td></table>
+			</tr>
+			</table>
+			</td>
+			</tr>
+		</table>
+		<hr size=3 noshade />
+		[% form1.submit %] [% form1.reset %]
+		[% form1.end %]
+		</body>
+	</html>
+	|;
 	}
 
 	sub save   { &{"save_$form->{tablename}"} }
@@ -164,7 +208,7 @@ snippet form
 			$form->{dbs}->insert('$1', $data) or $form->error($form->{dbs}->error);
 		}
 		$form->{dbs}->commit;
-		$form->redirect("Saved ...");
+		$form->redirect($locale->text("Saved ..."));
 	}
 
 	sub add_$1 {
@@ -189,7 +233,7 @@ snippet form
 	sub delete_$1 {
 		$form->{dbs}->query(qq|DELETE FROM $1 WHERE id = ?|, $form->{id});
 		$form->{dbs}->commit;
-		$form->redirect("Deleted ...");
+		$form->redirect($locale->text("Deleted ..."));
 	}
 
 snippet defaults
@@ -235,16 +279,9 @@ snippet report
 
 		my $table1 = &$1_table($query, \@bind, $totalcols, $groupcol);
 
-		$form->header;
-		print qq|
-			<body>
-			<h1>$title</h1>
-			<hr/>
-		|;
-
 		for (@searchcols){
 			my $label = $_; $label =~ tr/_/ /; $label = uc $label;
-			print qq|<b>$label</b>: $form->{$_}<br/>\n|;
+			print qq|<b>$label</b>: $form->{$_}<br/>\n| if $form->{$_};
 		};
 
 		print $table1->output;
@@ -318,12 +355,19 @@ snippet report
 			'id'
 		);
 
-		$table1->map_head(sub {
-			my $datum = shift;
-			$datum =~ tr/_/ /;
-			return qq|<a class="listheading">| . uc $datum . qq|</a>|;
-			}
+		my %headings = (
+			id => $locale->text('I D'),
 		);
+		$table1->map_head(sub {
+			my $col = shift;
+			my $label = $headings{$col};
+			if (!$label){
+				$col =~ tr/_/ /;
+				$label = uc $col;
+			}
+			return qq|<a class="listheading">$label</a>|;
+		});
+
 		return $table1;
 	}
 
@@ -368,7 +412,11 @@ snippet report
 
 	<hr size=3 noshade />
 
-	[% form1.submit %] [% form1.reset %]
+	<input type=submit class=submit name=action value="Update">
+	<input type=submit class=submit name=action value="Save">
+	<input type=submit class=submit name=action value="Save as new">
+	<input type=submit class=submit name=action value="Delete">
+
 	[% form1.end %]
 	<br/><br/>
 	|;
